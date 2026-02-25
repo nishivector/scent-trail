@@ -244,7 +244,8 @@ let masterCompressor;
 function initAudio() {
   if (audioReady) return Promise.resolve();
   if (typeof Tone === 'undefined') return Promise.resolve();
-  return Tone.start().then(() => {
+  try {
+    return Tone.start().then(() => {
     audioReady = true;
     masterCompressor = new Tone.Compressor(-18, 4).toDestination();
 
@@ -340,7 +341,10 @@ function initAudio() {
     rippleReverb.connect(new Tone.Gain(0.06).connect(masterCompressor));
 
     schedulePianoNotes();
-  });
+    });
+  } catch(e) {
+    return Promise.resolve();
+  }
 }
 
 let pianoTimeout = null;
