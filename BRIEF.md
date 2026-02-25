@@ -1,0 +1,16 @@
+ONE VERB: LURE
+GAME IN 10 WORDS: Drop bait. Distract the beast. Sprint for the exit.
+WHAT THE PLAYER MASTERS: Predicting the beast's attention arc and timing bait drops to open escape windows — with finite bait
+THE WOW MOMENT: Stage 3 — a second, smaller creature appears and it does not follow bait at all; it follows footstep sound, visualised as ripple rings spreading from your feet on stone floor. The player freezes without being told. Standing motionless while the first creature slowly chews your bait three tiles away is the most dread the game ever produces, and it costs zero UI.
+WHY RICARDO: Inside / Little Nightmares — the monster is scarier because of what it might do, minimal UI, dread through restraint not spectacle; Metal Slug — instant threat-reading, the beast's attention cone is always visible, you always know exactly how much time you have — the fear is anticipation, not surprise
+EMOTIONAL ARC:
+  start: Massive creature blocks the lit door at the far end. A glowing item pulses in your hand — obviously droppable. You drop it. The creature's head turns with a visible cone. Path opens. You run. You understand everything in 4 seconds.
+  groove: Fluency feels like choreography — you predict the head-turn radius, drop bait just before the creature rotates back toward you, and you're already at the next junction before it finishes eating
+  climax: Narrow corridor, two creatures, one bait remaining, stone floor that broadcasts footstep ripples. You must thread one unbroken movement: freeze, lure beast one left, sprint the soft-floored strip, reach the door before beast two completes its sweep. No margin.
+WHAT MAKES IT HARD: Bait has a scent radius — drop too far and the beast doesn't detect it; drop too close and it sees you first. The detection boundary is only hinted by the creature's ear animation, not shown as a circle. Exact safe distances must be learned through repetition, like a corner in Gran Turismo.
+SKILL CEILING: 1x player burns all bait in the first corridor and gets cornered. 10x player engineers a bait loop — places two drops in a configuration the beast cycles between indefinitely — and walks the entire stage without being detected once
+VISUAL: #0D0B08 (cave black), #C8A96E (bait amber glow), #8B1A1A (beast eye-shine red) — ground-level side-scroll, eye-height fixed camera, aesthetic: Inside's silhouette palette with Amnesia's creature mass and weight
+AUDIO: 42 BPM, near-silence broken only by a low sub-bass rumble that swells as the beast closes within 3 tiles, signature SFX: the wet heavy thud of the beast's foot hitting stone — loud enough to feel in your chest
+NOT: Avoids stealth-action combat (the beast cannot be killed, stunned, or outrun — only redirected); avoids horror jump-scare game (the beast is always visible in full silhouette — you always see exactly where it is — the terror is knowing and still miscalculating)
+MECHANIC SELF-EVIDENT CHECK: Player sees their small silhouette at left. A massive creature fills the corridor between them and a glowing door at right. A single glowing item pulses in the player's hand — its shape implies it can be thrown or dropped. Player drops it. The creature's head rotates with a drawn attention cone, walks toward the bait. The corridor clears. Player runs. No tutorial. No text. Four seconds.
+GAME NAME HINT: scent-trail

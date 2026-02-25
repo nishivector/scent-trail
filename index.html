@@ -1,0 +1,2043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Scent Trail</title>
+<script src="https://cdn.jsdelivr.net/npm/tone@15.1.22/dist/Tone.js"></script>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.0/examples/jsm/" } }
+</script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0D0B08; overflow: hidden; font-family: 'Courier New', monospace; }
+canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; }
+#startScreen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: #0D0B08; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; z-index: 100;
+  cursor: pointer; user-select: none;
+}
+#startScreen.hidden { display: none; }
+#instructionsScreen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: #0D0B08; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; z-index: 99;
+  cursor: pointer; user-select: none;
+  opacity: 0; transition: opacity 0.3s; pointer-events: none;
+}
+#instructionsScreen.hidden { display: none; }
+#instructionsScreen .inst-lines {
+  display: flex; flex-direction: column; align-items: center; gap: 18px;
+  margin-top: 40px;
+}
+#instructionsScreen .inst-line {
+  color: #C8A96E; font-family: 'Courier New', monospace;
+  font-size: clamp(12px, 2.2vw, 18px); letter-spacing: 3px;
+  text-align: center; opacity: 0.85;
+}
+#instructionsScreen .tap-hint {
+  color: #6B4F1A; font-family: 'Courier New', monospace;
+  font-size: clamp(10px, 1.5vw, 13px); letter-spacing: 4px;
+  margin-top: 50px; animation: blink 1.8s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:0.3} 50%{opacity:0.8} }
+#hud {
+  position: fixed; top: 16px; left: 16px; z-index: 50;
+  display: flex; gap: 8px; align-items: center; pointer-events: none;
+}
+.bait-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #C8A96E;
+  box-shadow: 0 0 6px #C8A96E, 0 0 12px #C8A96E;
+  transition: opacity 0.3s;
+}
+.bait-dot.used { opacity: 0; }
+#overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: #000; z-index: 200; pointer-events: none; opacity: 0;
+  transition: opacity 0.3s;
+}
+#completeScreen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: #0D0B08; display: none; flex-direction: column;
+  align-items: center; justify-content: center; z-index: 300;
+  cursor: pointer;
+}
+#completeScreen .complete-text {
+  color: #C8A96E; font-family: 'Courier New', monospace;
+  font-size: clamp(18px, 4vw, 36px); letter-spacing: 8px;
+  text-align: center;
+}
+#completeScreen .restart-hint {
+  color: #6B4F1A; font-family: 'Courier New', monospace;
+  font-size: clamp(10px, 1.5vw, 13px); letter-spacing: 4px;
+  margin-top: 30px; animation: blink 1.8s ease-in-out infinite;
+}
+</style>
+</head>
+<body>
+
+<!-- Start Screen -->
+<div id="startScreen">
+  <svg id="startSvg" width="100%" height="100%" style="position:absolute;top:0;left:0;" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet">
+    <defs>
+      <filter id="titleGlow" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="6" result="blur6"/>
+        <feGaussianBlur stdDeviation="2" result="blur2"/>
+        <feComposite in="blur6" in2="blur2" operator="over" result="blurCombo"/>
+        <feColorMatrix type="matrix" values="1 0.5 0 0 0  0.8 0.4 0 0 0  0 0.1 0 0 0  0 0 0 1 0" result="amber"/>
+        <feComposite in="SourceGraphic" in2="amber" operator="over"/>
+      </filter>
+      <filter id="titleGlow2">
+        <feGaussianBlur stdDeviation="8" result="b"/>
+        <feColorMatrix in="b" type="matrix" values="1.2 0.5 0 0 0.1  0.8 0.6 0 0 0  0 0.2 0 0 0  0 0 0 0.9 0"/>
+      </filter>
+    </defs>
+    <!-- Beast silhouette - right half, animated head sweep -->
+    <g id="startBeast" opacity="0.15" transform="translate(580,120)">
+      <g id="startBeastHead" transform-origin="0 0">
+        <!-- Beast body -->
+        <ellipse cx="0" cy="220" rx="45" ry="80" fill="#0A0806"/>
+        <!-- Beast neck -->
+        <rect x="-18" y="120" width="36" height="80" rx="8" fill="#0A0806"/>
+        <!-- Beast head -->
+        <ellipse id="beastHeadEllipse" cx="0" cy="100" rx="32" ry="38" fill="#0A0806"/>
+        <!-- Eye shine -->
+        <ellipse id="beastEyeLeft" cx="-14" cy="95" rx="6" ry="5" fill="#8B1A1A" opacity="0.9">
+          <animate attributeName="opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite"/>
+        </ellipse>
+        <ellipse id="beastEyeRight" cx="14" cy="95" rx="6" ry="5" fill="#8B1A1A" opacity="0.9">
+          <animate attributeName="opacity" values="0.6;1;0.6" dur="3s" begin="0.5s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- Legs -->
+        <rect x="-28" y="295" width="18" height="60" rx="5" fill="#0A0806"/>
+        <rect x="10" y="295" width="18" height="60" rx="5" fill="#0A0806"/>
+      </g>
+    </g>
+    <!-- Title glow layer (wide) -->
+    <text id="titleGlowText" x="400" y="200" text-anchor="middle"
+      font-family="'Courier New', monospace" font-size="64" letter-spacing="12"
+      fill="#C8A96E" filter="url(#titleGlow2)" opacity="0.5">SCENT TRAIL</text>
+    <!-- Title main layer -->
+    <g id="titleGroup" opacity="0.92">
+      <text x="400" y="200" text-anchor="middle"
+        font-family="'Courier New', monospace" font-size="64" letter-spacing="12"
+        fill="#C8A96E" filter="url(#titleGlow)">SCENT TRAIL</text>
+      <text x="400" y="200" text-anchor="middle"
+        font-family="'Courier New', monospace" font-size="64" letter-spacing="12"
+        fill="#F0D49A" opacity="0.4">SCENT TRAIL</text>
+    </g>
+    <!-- Tagline -->
+    <text x="400" y="240" text-anchor="middle"
+      font-family="'Courier New', monospace" font-size="14" letter-spacing="8"
+      fill="#6B4F1A">DROP IT. WATCH IT TURN. RUN.</text>
+    <!-- Tap hint -->
+    <text id="startTapHint" x="400" y="430" text-anchor="middle"
+      font-family="'Courier New', monospace" font-size="13" letter-spacing="5"
+      fill="#6B4F1A">TAP TO BEGIN</text>
+    <!-- Ambient bait dots container -->
+    <g id="ambientBaits"></g>
+  </svg>
+</div>
+
+<!-- Instructions Screen -->
+<div id="instructionsScreen">
+  <svg width="100" height="80" viewBox="0 0 100 80" style="margin-bottom:10px;opacity:0.5;">
+    <ellipse cx="50" cy="50" rx="22" ry="30" fill="#0A0806"/>
+    <rect x="36" y="20" width="28" height="30" rx="6" fill="#0A0806"/>
+    <ellipse cx="50" cy="20" rx="18" ry="20" fill="#0A0806"/>
+    <ellipse cx="41" cy="16" rx="4" ry="3" fill="#8B1A1A" opacity="0.9"/>
+    <ellipse cx="59" cy="16" rx="4" ry="3" fill="#8B1A1A" opacity="0.9"/>
+  </svg>
+  <div class="inst-lines">
+    <div class="inst-line">DROP BAIT TO LURE THE BEAST AWAY</div>
+    <div class="inst-line">SPACE / TAP TO DROP BAIT AT YOUR FEET</div>
+    <div class="inst-line">BEAST FOLLOWS BAIT — BUT NOT FOREVER</div>
+    <div class="inst-line">REACH THE GLOWING DOOR</div>
+  </div>
+  <div class="tap-hint">TAP TO ENTER</div>
+</div>
+
+<!-- HUD -->
+<div id="hud"></div>
+
+<!-- Overlay for fade -->
+<div id="overlay"></div>
+
+<!-- Complete Screen -->
+<div id="completeScreen">
+  <div class="complete-text">SCENT TRAIL COMPLETE</div>
+  <div class="restart-hint">TAP TO RESTART</div>
+</div>
+
+<!-- GitHub link -->
+<a href="https://github.com/nishivector/scent-trail" target="_blank" style="position:fixed;bottom:16px;right:16px;color:rgba(255,255,255,0.4);font-size:12px;text-decoration:none;font-family:monospace;z-index:1000;">GitHub ↗</a>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+// ─── CONSTANTS ───────────────────────────────────────────────────────────────
+const SAVE_KEY = 'scent-trail-level';
+const TILE = 48; // base tile size px
+const CAVE_BLACK = 0x0D0B08;
+const WARM_STONE = 0x1C1812;
+const STONE_HIGHLIGHT = 0x2E2820;
+const PLAYER_FILL = 0x1A1510;
+const PLAYER_RIM = 0x3D3228;
+const BAIT_DIM = 0x6B4F1A;
+const BAIT_PULSE = 0xC8A96E;
+const BAIT_CORE = 0xF0D49A;
+const BEAST_FILL = 0x0A0806;
+const BEAST_EYE_NORMAL = 0x8B1A1A;
+const BEAST_EYE_ALERT = 0xC42222;
+const EXIT_GLOW = 0xE8E0C0;
+const RIPPLE_COLOR = '#A0A0A0';
+const SOFT_FLOOR = 0x221D14;
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let gameState = 'start'; // 'start' | 'instructions' | 'playing' | 'dead' | 'complete'
+let gameStartTime = 0;
+let hasEverActed = false;
+let currentLevel = 1;
+
+// ─── RENDERER SETUP ──────────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(CAVE_BLACK);
+document.body.appendChild(renderer.domElement);
+renderer.domElement.style.position = 'fixed';
+renderer.domElement.style.top = '0';
+renderer.domElement.style.left = '0';
+renderer.domElement.style.width = '100%';
+renderer.domElement.style.height = '100%';
+renderer.domElement.style.touchAction = 'none';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(CAVE_BLACK);
+
+// Orthographic camera
+let camW = window.innerWidth;
+let camH = window.innerHeight;
+const camera = new THREE.OrthographicCamera(-camW/2, camW/2, camH/2, -camH/2, -100, 100);
+camera.position.z = 10;
+
+// Post-processing
+const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(camW, camH), 0.55, 0.4, 0.60);
+composer.addPass(bloomPass);
+
+// ─── AUDIO ────────────────────────────────────────────────────────────────────
+let audioReady = false;
+let droneGain, subBassOsc, subBassGain, subBassLFO, pianoSynth, pianoInterval;
+let beastFootstepSynth, baitDropSynth, scentSynth, scentLFO, eatNoiseSynth, alertSynth, rippleSynth;
+let proxSine, proxGain;
+let distortionNode;
+let masterCompressor;
+
+function initAudio() {
+  if (audioReady) return Promise.resolve();
+  return Tone.start().then(() => {
+    audioReady = true;
+    masterCompressor = new Tone.Compressor(-18, 4).toDestination();
+
+    // Drone
+    droneGain = new Tone.Gain(0.15).connect(masterCompressor);
+    const droneOsc = new Tone.Oscillator(55, 'sawtooth');
+    const droneFilter = new Tone.Filter(180, 'lowpass');
+    const droneReverb = new Tone.Reverb({ decay: 4, wet: 0.5 });
+    droneOsc.connect(droneFilter);
+    droneFilter.connect(droneReverb);
+    droneReverb.connect(droneGain);
+    droneOsc.start();
+
+    // Sub-bass
+    subBassGain = new Tone.Gain(0.08).connect(masterCompressor);
+    subBassOsc = new Tone.Oscillator(38, 'sine');
+    distortionNode = new Tone.Distortion(0);
+    subBassLFO = new Tone.Oscillator(0.3, 'sine');
+    const subBassLFOGain = new Tone.Gain(2);
+    subBassLFO.connect(subBassLFOGain);
+    subBassOsc.connect(distortionNode);
+    distortionNode.connect(subBassGain);
+    subBassOsc.start();
+    subBassLFO.start();
+
+    // Proximity sine (60Hz)
+    proxGain = new Tone.Gain(0).connect(masterCompressor);
+    proxSine = new Tone.Oscillator(60, 'sine');
+    proxSine.connect(proxGain);
+    proxSine.start();
+
+    // Piano
+    pianoSynth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.5, decay: 0.5, sustain: 0.3, release: 2.0 }
+    }).connect(masterCompressor);
+    pianoSynth.set({ volume: -18 });
+
+    // SFX - Beast footstep
+    const footCompressor = new Tone.Compressor(-24, 8);
+    const footReverb = new Tone.Reverb({ decay: 1.8, wet: 0.4 });
+    const footDist = new Tone.Distortion(0.15);
+    beastFootstepSynth = new Tone.MembraneSynth({
+      pitchDecay: 0.08, octaves: 3,
+      envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.1 }
+    });
+    beastFootstepSynth.connect(footDist);
+    footDist.connect(footReverb);
+    footReverb.connect(footCompressor);
+    footCompressor.connect(masterCompressor);
+
+    // SFX - Bait drop
+    const baitReverb = new Tone.Reverb({ decay: 0.9, wet: 0.3 });
+    baitDropSynth = new Tone.MetalSynth({
+      frequency: 180, harmonicity: 3.1, modulationIndex: 12,
+      envelope: { attack: 0.001, decay: 0.4, release: 0.2 }
+    });
+    baitDropSynth.connect(baitReverb);
+    baitReverb.connect(masterCompressor);
+
+    // SFX - Scent active subliminal
+    scentSynth = new Tone.Oscillator(55, 'sine');
+    scentLFO = new Tone.Oscillator(0.5, 'sine');
+    const scentGainNode = new Tone.Gain(0.04).connect(masterCompressor);
+    const scentLFOGain = new Tone.Gain(0.02);
+    scentLFO.connect(scentLFOGain);
+    scentSynth.connect(scentGainNode);
+    scentLFO.start();
+    scentSynth.start();
+
+    // SFX - Beast eating
+    const eatFilter = new Tone.Filter(200, 'lowpass');
+    const eatDist = new Tone.Distortion(0.2);
+    eatNoiseSynth = new Tone.NoiseSynth({ noise: { type: 'brown' }, envelope: { attack: 0.1, decay: 10, sustain: 1, release: 0.5 } });
+    eatNoiseSynth.connect(eatFilter);
+    eatFilter.connect(eatDist);
+    eatDist.connect(new Tone.Gain(0.08).connect(masterCompressor));
+
+    // SFX - Alert
+    alertSynth = new Tone.Synth({
+      oscillator: { type: 'sawtooth' },
+      envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.05 }
+    }).connect(masterCompressor);
+    alertSynth.set({ volume: -12 });
+
+    // SFX - Footstep ripple
+    const rippleReverb = new Tone.Reverb({ decay: 2.4, wet: 0.6 });
+    rippleSynth = new Tone.Synth({
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.05 }
+    });
+    rippleSynth.connect(rippleReverb);
+    rippleReverb.connect(new Tone.Gain(0.06).connect(masterCompressor));
+
+    schedulePianoNotes();
+  });
+}
+
+let pianoTimeout = null;
+let pianoStopped = false;
+function schedulePianoNotes() {
+  if (!audioReady || pianoStopped) return;
+  const notes = ['A2', 'E3', 'D3', 'G2', 'B2', 'C3'];
+  const note = notes[Math.floor(Math.random() * notes.length)];
+  if (pianoSynth) pianoSynth.triggerAttackRelease(note, '2n');
+  const isLast = gameLevel && gameLevel.baitCount === 1 && activeBait !== null;
+  const minT = isLast ? 6000 : 8000;
+  const maxT = isLast ? 10000 : 22000;
+  const delay = minT + Math.random() * (maxT - minT);
+  pianoTimeout = setTimeout(schedulePianoNotes, delay);
+}
+
+function updateMusicState() {
+  if (!audioReady) return;
+  if (!beasts || beasts.length === 0) return;
+
+  let minDist = Infinity;
+  let anyAlerted = false;
+  beasts.forEach(b => {
+    const d = Math.hypot(b.x - player.x, b.y - player.y);
+    if (d < minDist) minDist = d;
+    if (b.state === 'chase' || b.state === 'alerted') anyAlerted = true;
+  });
+
+  // Sub-bass level
+  let targetSubBass = 0.08;
+  if (anyAlerted) targetSubBass = 0.18;
+  if (minDist <= 3) targetSubBass = 0.28;
+  if (subBassGain) subBassGain.gain.rampTo(targetSubBass, 0.8);
+
+  // Proximity 60Hz
+  if (proxGain) {
+    const proxLevel = minDist <= 3 ? 0.06 : 0;
+    proxGain.gain.rampTo(proxLevel, 0.5);
+  }
+
+  // Piano stops near beast
+  if (pianoStopped !== (minDist <= 1)) {
+    pianoStopped = minDist <= 1;
+  }
+
+  // Distortion when bait depleted
+  if (distortionNode && gameLevel) {
+    const dep = gameLevel.baitCount <= 0 && activeBait === null;
+    distortionNode.distortion = dep ? 0.03 : 0;
+  }
+}
+
+function playStageClear() {
+  if (!audioReady) return;
+  if (subBassGain) subBassGain.gain.rampTo(0, 1.2);
+  if (proxGain) proxGain.gain.rampTo(0, 1.2);
+  if (droneGain) droneGain.gain.rampTo(0, 1.2);
+  pianoStopped = true;
+  if (pianoTimeout) clearTimeout(pianoTimeout);
+  // Win tone
+  const winSynth = new Tone.Synth({
+    oscillator: { type: 'triangle' },
+    envelope: { attack: 0.8, decay: 1.0, sustain: 0.5, release: 1.5 }
+  }).connect(masterCompressor);
+  winSynth.set({ volume: -10 });
+  winSynth.triggerAttackRelease('A3', '2n+1n');
+  setTimeout(() => {
+    if (subBassGain) subBassGain.gain.rampTo(0.08, 0);
+    if (droneGain) droneGain.gain.rampTo(0.15, 0);
+    pianoStopped = false;
+    schedulePianoNotes();
+  }, 3000);
+}
+
+function playDeath() {
+  if (!audioReady) return;
+  if (subBassGain) subBassGain.gain.rampTo(0, 0.05);
+  if (proxGain) proxGain.gain.rampTo(0, 0.05);
+  if (droneGain) droneGain.gain.rampTo(0, 0.05);
+  pianoStopped = true;
+  if (pianoTimeout) clearTimeout(pianoTimeout);
+  setTimeout(() => {
+    if (!audioReady) return;
+    const deathSynth = new Tone.MembraneSynth({
+      pitchDecay: 0.15, octaves: 4,
+      envelope: { attack: 0.001, decay: 0.8, sustain: 0, release: 0.3 }
+    }).connect(masterCompressor);
+    deathSynth.triggerAttackRelease(80, '8n');
+    setTimeout(() => {
+      if (subBassGain) subBassGain.gain.rampTo(0.08, 0);
+      if (droneGain) droneGain.gain.rampTo(0.15, 0);
+      pianoStopped = false;
+      schedulePianoNotes();
+    }, 2000);
+  }, 500);
+}
+
+// ─── LEVEL DATA ───────────────────────────────────────────────────────────────
+// Tile types: ' '=empty/wall, '#'=wall, 'F'=stone floor, 'S'=soft floor, 'E'=exit, 'P'=player start
+// Map stored as rows of characters
+const LEVELS = {
+  1: {
+    name: "THE LESSON",
+    baitCount: 3,
+    scentRadius: 4.0,
+    eatDuration: 6.0,
+    map: [
+      '###############',
+      '#FFFFFFFFFFFFFE#',
+      '#FFFFFFFFFFFFFFF#',
+      '###############',
+    ],
+    playerStart: { x: 1, y: 1 },
+    exitPos: { x: 13, y: 1 },
+    beasts: [
+      {
+        type: 'normal',
+        startX: 8, startY: 1,
+        patrolPoints: [{x:5,y:1},{x:5,y:1},{x:11,y:1}],
+        walkSpeed: 1.2,
+        sweepAngle: 40,
+        sweepPeriod: 5.0,
+        patrolRange: 3
+      }
+    ]
+  },
+  2: {
+    name: "THE JUNCTION",
+    baitCount: 4,
+    scentRadius: 3.5,
+    eatDuration: 4.5,
+    map: [
+      '###################',
+      '#FFFFFFFFFFFFFFFFF#',
+      '#FFFFFFFFFFFFFFFFF#',
+      '#########FFF#######',
+      '#########FFF#######',
+      '#########FFF#######',
+      '#########EFF#######',
+      '###################',
+    ],
+    playerStart: { x: 1, y: 1 },
+    exitPos: { x: 9, y: 6 },
+    beasts: [
+      {
+        type: 'normal',
+        startX: 9, startY: 2,
+        patrolPoints: [{x:5,y:2},{x:14,y:2}],
+        walkSpeed: 1.4,
+        sweepAngle: 50,
+        sweepPeriod: 4.0,
+        patrolRange: 5
+      }
+    ]
+  },
+  3: {
+    name: "THE LISTENER",
+    baitCount: 4,
+    scentRadius: 3.0,
+    eatDuration: 3.5,
+    map: [
+      '#####################',
+      '#SSSSSSSSSSSSFFFFFFF#',
+      '#SSSSSSSSSSSSFFFFFFF#',
+      '#SSSSSSS#####FFFFFFF#',
+      '#SSSSSSS#####FFFFFFF#',
+      '#SSSSSSS#####Effffff#',
+      '#####################',
+    ],
+    playerStart: { x: 1, y: 1 },
+    exitPos: { x: 13, y: 5 },
+    beasts: [
+      {
+        type: 'normal',
+        startX: 13, startY: 2,
+        patrolPoints: [{x:12,y:2},{x:19,y:2}],
+        walkSpeed: 1.5,
+        sweepAngle: 45,
+        sweepPeriod: 3.8,
+        patrolRange: 4
+      },
+      {
+        type: 'listener',
+        startX: 16, startY: 4,
+        patrolPoints: [{x:14,y:4},{x:18,y:4}],
+        walkSpeed: 1.8,
+        sweepAngle: 30,
+        sweepPeriod: 3.0,
+        patrolRange: 3
+      }
+    ]
+  },
+  4: {
+    name: "THE LOOP",
+    baitCount: 5,
+    scentRadius: 2.8,
+    eatDuration: 3.0,
+    map: [
+      '###########',
+      '#FFFFFFFFF#',
+      '#FFFFFFFFF#',
+      '#FFFEFFFFF#',
+      '####FFF####',
+      '#FFFFFFFFF#',
+      '#FFFFFFFFF#',
+      '#FFFFFFFFF#',
+      '####FFF####',
+      '#FFFFFFFFF#',
+      '#FFFFFFFFF#',
+      '#FFFFFFFFF#',
+      '###########',
+    ],
+    playerStart: { x: 5, y: 10 },
+    exitPos: { x: 5, y: 3 },
+    beasts: [
+      {
+        type: 'normal',
+        startX: 3, startY: 5,
+        patrolPoints: [{x:1,y:5},{x:9,y:5}],
+        walkSpeed: 1.6,
+        sweepAngle: 60,
+        sweepPeriod: 3.2,
+        patrolRange: 8
+      },
+      {
+        type: 'listener',
+        startX: 5, startY: 2,
+        patrolPoints: [{x:2,y:2},{x:8,y:2}],
+        walkSpeed: 2.0,
+        sweepAngle: 30,
+        sweepPeriod: 2.5,
+        patrolRange: 5
+      }
+    ]
+  },
+  5: {
+    name: "THE THREADING",
+    baitCount: 3,
+    scentRadius: 2.5,
+    eatDuration: 2.5,
+    map: [
+      '#######################',
+      '#FFFFF#FFFFFFFSSS#FFFF#',
+      '#FFFFF#FFFFFFFSSS#FFFF#',
+      '#FFFFF#FFFFFFFSSS#FFFF#',
+      '#FFFFF#FFFFFFFSSS#FFFF#',
+      '#FFFFF#FFFFFFFSSS#FFFF#',
+      '##FFF###FFFFFFF###FFF##',
+      '##FFF###FFFFFFF###FFF##',
+      '#FFFFE#FFFFFFF#EFFFFF#',
+      '##FFF###########FFF###',
+      '#######################',
+    ],
+    playerStart: { x: 1, y: 1 },
+    exitPos: { x: 16, y: 8 },
+    beasts: [
+      {
+        type: 'normal',
+        startX: 3, startY: 2,
+        patrolPoints: [{x:1,y:2},{x:5,y:2}],
+        walkSpeed: 1.7,
+        sweepAngle: 55,
+        sweepPeriod: 2.8,
+        patrolRange: 4
+      },
+      {
+        type: 'normal',
+        startX: 10, startY: 2,
+        patrolPoints: [{x:7,y:2},{x:13,y:2}],
+        walkSpeed: 1.6,
+        sweepAngle: 45,
+        sweepPeriod: 3.0,
+        patrolRange: 6
+      },
+      {
+        type: 'listener',
+        startX: 18, startY: 2,
+        patrolPoints: [{x:16,y:2},{x:21,y:2}],
+        walkSpeed: 2.0,
+        sweepAngle: 30,
+        sweepPeriod: 2.5,
+        patrolRange: 4
+      }
+    ]
+  }
+};
+
+// ─── GAME OBJECTS ─────────────────────────────────────────────────────────────
+let gameLevel = null;
+let tileMap = [];
+let mapWidth = 0, mapHeight = 0;
+let tileSize = TILE;
+
+let player = {
+  x: 0, y: 0,
+  vx: 0, vy: 0,
+  facingDir: 1,
+  animFrame: 0,
+  animTimer: 0,
+  idleTimer: 0,
+  idleShift: 0
+};
+
+let beasts = [];
+let activeBait = null;
+let footstepRipples = [];
+let gameObjects = new THREE.Group();
+scene.add(gameObjects);
+
+// Camera
+let camX = 0;
+let camTargetX = 0;
+let camDriftTimer = 0;
+
+// ─── TILE HELPERS ─────────────────────────────────────────────────────────────
+function isWalkable(tx, ty) {
+  if (tx < 0 || ty < 0 || ty >= mapHeight || tx >= mapWidth) return false;
+  const t = tileMap[ty][tx];
+  return t === 'F' || t === 'S' || t === 'E' || t === 'P';
+}
+
+function getTile(tx, ty) {
+  if (tx < 0 || ty < 0 || ty >= mapHeight || tx >= mapWidth) return '#';
+  return tileMap[ty][tx];
+}
+
+function isStone(tx, ty) {
+  const t = getTile(tx, ty);
+  return t === 'F' || t === 'E' || t === 'P';
+}
+
+// ─── CANVAS DRAWING HELPERS ──────────────────────────────────────────────────
+function makeCanvasTex(w, h, drawFn) {
+  const cvs = document.createElement('canvas');
+  cvs.width = w; cvs.height = h;
+  const ctx = cvs.getContext('2d');
+  drawFn(ctx, w, h);
+  const tex = new THREE.CanvasTexture(cvs);
+  return { tex, cvs, ctx };
+}
+
+function hexToStr(hex) {
+  return '#' + hex.toString(16).padStart(6, '0');
+}
+
+// ─── TILE RENDERING ──────────────────────────────────────────────────────────
+let tileMeshes = [];
+let exitMesh = null;
+let exitGlowTime = 0;
+
+function buildTileMap(levelData) {
+  // Parse map strings
+  const rows = levelData.map;
+  mapHeight = rows.length;
+  mapWidth = Math.max(...rows.map(r => r.length));
+  tileMap = rows.map(r => r.split(''));
+}
+
+function getTileSize() {
+  const aspect = window.innerWidth / window.innerHeight;
+  if (aspect < 1) {
+    // Portrait — scale down
+    return Math.floor(TILE * aspect * 1.2);
+  }
+  return TILE;
+}
+
+function buildScene(levelData) {
+  // Clear existing
+  while (gameObjects.children.length > 0) gameObjects.remove(gameObjects.children[0]);
+  tileMeshes = [];
+  exitMesh = null;
+  footstepRipples = [];
+
+  tileSize = getTileSize();
+
+  // Build floor tiles
+  for (let ty = 0; ty < mapHeight; ty++) {
+    for (let tx = 0; tx < mapWidth; tx++) {
+      const tile = tileMap[ty][tx];
+      if (tile === '#' || tile === ' ') continue;
+
+      const isSoft = tile === 'S';
+      const isExit = tile === 'E';
+
+      // Draw tile texture
+      const sz = tileSize;
+      const { tex, cvs, ctx } = makeCanvasTex(sz, sz, (ctx) => {
+        const baseColor = isSoft ? '#221D14' : '#1C1812';
+        ctx.fillStyle = baseColor;
+        ctx.fillRect(0, 0, sz, sz);
+
+        if (isSoft) {
+          // noise pattern
+          for (let i = 0; i < 40; i++) {
+            const nx = Math.random() * sz;
+            const ny = Math.random() * sz;
+            ctx.fillStyle = 'rgba(40,35,25,0.3)';
+            ctx.fillRect(nx, ny, 2, 2);
+          }
+        }
+
+        // Stone highlight edges
+        ctx.fillStyle = '#2E2820';
+        ctx.fillRect(0, 0, sz, 1);
+        ctx.fillRect(0, 0, 1, sz);
+
+        if (isExit) {
+          // Exit glow
+          const grd = ctx.createRadialGradient(sz/2, sz/2, 0, sz/2, sz/2, sz/2);
+          grd.addColorStop(0, 'rgba(240,224,192,0.8)');
+          grd.addColorStop(0.4, 'rgba(232,224,192,0.4)');
+          grd.addColorStop(1, 'rgba(232,224,192,0)');
+          ctx.fillStyle = grd;
+          ctx.fillRect(0, 0, sz, sz);
+        }
+      });
+
+      const geo = new THREE.PlaneGeometry(sz, sz);
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(tx * sz + sz/2, -(ty * sz + sz/2), 0);
+      gameObjects.add(mesh);
+      tileMeshes.push(mesh);
+
+      if (isExit) exitMesh = mesh;
+    }
+  }
+}
+
+// ─── PLAYER RENDERING ────────────────────────────────────────────────────────
+let playerMesh = null;
+let playerCanvas = null;
+let playerCtx = null;
+
+function createPlayerMesh() {
+  const sz = tileSize;
+  const ph = Math.round(sz * 0.58); // ~28px at 48px tile
+  const pw = Math.round(ph * 0.6);
+  playerCanvas = document.createElement('canvas');
+  playerCanvas.width = pw * 2;
+  playerCanvas.height = ph * 2;
+  playerCtx = playerCanvas.getContext('2d');
+
+  const tex = new THREE.CanvasTexture(playerCanvas);
+  const geo = new THREE.PlaneGeometry(pw * 2, ph * 2);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+  playerMesh = new THREE.Mesh(geo, mat);
+  playerMesh.position.z = 2;
+  gameObjects.add(playerMesh);
+
+  drawPlayer(0, false);
+  return tex;
+}
+
+function drawPlayer(frame, moving) {
+  if (!playerCtx) return;
+  const cvs = playerCanvas;
+  const ctx = playerCtx;
+  ctx.clearRect(0, 0, cvs.width, cvs.height);
+
+  const cx = cvs.width / 2;
+  const cy = cvs.height * 0.55;
+  const h = cvs.height * 0.85;
+  const w = h * 0.45;
+
+  const bob = moving ? Math.sin(frame * Math.PI * 0.6) * 1.5 : (Math.sin(player.idleTimer * 0.8) * 1.0);
+
+  ctx.save();
+  ctx.translate(cx, cy + bob);
+
+  // Body - hunched silhouette
+  ctx.fillStyle = hexToStr(PLAYER_FILL);
+  ctx.strokeStyle = hexToStr(PLAYER_RIM);
+  ctx.lineWidth = 1;
+
+  // Legs
+  if (moving) {
+    const legSwing = Math.sin(frame * Math.PI * 0.6) * 5;
+    ctx.beginPath();
+    ctx.moveTo(-w*0.15, 0);
+    ctx.lineTo(-w*0.3 + legSwing, h*0.4);
+    ctx.lineWidth = w * 0.18;
+    ctx.strokeStyle = hexToStr(PLAYER_FILL);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(w*0.15, 0);
+    ctx.lineTo(w*0.3 - legSwing, h*0.4);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(-w*0.15, 0);
+    ctx.lineTo(-w*0.2, h*0.4);
+    ctx.lineWidth = w * 0.18;
+    ctx.strokeStyle = hexToStr(PLAYER_FILL);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(w*0.15, 0);
+    ctx.lineTo(w*0.2, h*0.4);
+    ctx.stroke();
+  }
+
+  // Body (hunched — lean forward)
+  ctx.fillStyle = hexToStr(PLAYER_FILL);
+  ctx.strokeStyle = hexToStr(PLAYER_RIM);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.ellipse(0, -h*0.05, w*0.32, h*0.28, -0.15, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+
+  // Head (down-tilted)
+  ctx.beginPath();
+  ctx.ellipse(w*0.08, -h*0.36, w*0.22, h*0.18, 0.2, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+
+  // Bait arm extended forward
+  const armDir = player.facingDir >= 0 ? 1 : -1;
+  ctx.beginPath();
+  ctx.moveTo(armDir * w * 0.2, -h*0.12);
+  ctx.lineTo(armDir * w * 0.55, -h*0.05);
+  ctx.lineWidth = w * 0.12;
+  ctx.strokeStyle = hexToStr(PLAYER_FILL);
+  ctx.stroke();
+
+  ctx.restore();
+
+  if (playerMesh) playerMesh.material.map.needsUpdate = true;
+}
+
+// ─── BEAST RENDERING ─────────────────────────────────────────────────────────
+function createBeastObjects() {
+  beasts.forEach(beast => {
+    const sz = tileSize;
+    const bh = sz * 1.75; // 84px at 48px tile
+    const bw = bh * 0.55;
+
+    const cvs = document.createElement('canvas');
+    cvs.width = Math.round(bw * 2);
+    cvs.height = Math.round(bh * 2);
+    const ctx = cvs.getContext('2d');
+    beast.canvas = cvs;
+    beast.ctx = ctx;
+
+    const tex = new THREE.CanvasTexture(cvs);
+    beast.tex = tex;
+
+    const geo = new THREE.PlaneGeometry(cvs.width, cvs.height);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.z = 1;
+    gameObjects.add(mesh);
+    beast.mesh = mesh;
+
+    // Attention cone mesh
+    const coneGeo = createConeGeometry(beast);
+    const coneMat = new THREE.MeshBasicMaterial({
+      color: beast.state === 'chase' ? BEAST_EYE_ALERT : BEAST_EYE_NORMAL,
+      transparent: true,
+      opacity: 0.08,
+      side: THREE.DoubleSide
+    });
+    const coneMesh = new THREE.Mesh(coneGeo, coneMat);
+    coneMesh.position.z = 0.5;
+    gameObjects.add(coneMesh);
+    beast.coneMesh = coneMesh;
+    beast.coneMat = coneMat;
+
+    drawBeast(beast);
+  });
+}
+
+function createConeGeometry(beast) {
+  const halfAngle = (beast.sweepAngle || 45) * Math.PI / 180;
+  const depth = 2.5 * tileSize;
+  const segments = 12;
+  const positions = [0, 0, 0];
+  for (let i = 0; i <= segments; i++) {
+    const a = -halfAngle + (2 * halfAngle * i / segments);
+    positions.push(Math.cos(a) * depth, Math.sin(a) * depth, 0);
+  }
+  const geo = new THREE.BufferGeometry();
+  const verts = new Float32Array(positions);
+  geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+  const indices = [];
+  for (let i = 0; i < segments; i++) {
+    indices.push(0, i + 1, i + 2);
+  }
+  geo.setIndex(indices);
+  return geo;
+}
+
+function drawBeast(beast) {
+  const ctx = beast.ctx;
+  const cvs = beast.canvas;
+  ctx.clearRect(0, 0, cvs.width, cvs.height);
+
+  const cx = cvs.width / 2;
+  const cy = cvs.height * 0.5;
+  const bh = cvs.height * 0.9;
+  const bw = cvs.width * 0.45;
+
+  const isAlerted = beast.state === 'chase' || beast.state === 'alerted';
+  const eyeColor = isAlerted ? hexToStr(BEAST_EYE_ALERT) : hexToStr(BEAST_EYE_NORMAL);
+
+  // Walk bob
+  const bob = Math.sin(beast.walkTimer * (beast.walkSpeed || 1.2) * 3) * 2;
+
+  ctx.save();
+  ctx.translate(cx, cy + bob);
+
+  // Legs
+  const legSwing = Math.sin(beast.walkTimer * (beast.walkSpeed || 1.2) * 3) * 8;
+  ctx.strokeStyle = hexToStr(BEAST_FILL);
+  ctx.lineWidth = bw * 0.22;
+  ctx.beginPath();
+  ctx.moveTo(-bw*0.2, bh*0.15);
+  ctx.lineTo(-bw*0.3 + legSwing, bh*0.48);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(bw*0.2, bh*0.15);
+  ctx.lineTo(bw*0.3 - legSwing, bh*0.48);
+  ctx.stroke();
+
+  // Body - heavy, massive
+  ctx.fillStyle = hexToStr(BEAST_FILL);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, bw*0.48, bh*0.3, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Neck
+  ctx.fillRect(-bw*0.18, -bh*0.35, bw*0.36, bh*0.25);
+
+  // Head - lowered to fit corridor
+  const headTilt = beast.type === 'listener' ? 0.3 : (isAlerted ? 0.1 : 0.25);
+  ctx.save();
+  ctx.translate(0, -bh*0.35);
+  ctx.rotate(headTilt);
+
+  ctx.fillStyle = hexToStr(BEAST_FILL);
+  ctx.beginPath();
+  ctx.ellipse(0, -bh*0.08, bw*0.38, bh*0.2, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Eye shine
+  const eyeGrd = ctx.createRadialGradient(-bw*0.15, -bh*0.12, 0, -bw*0.15, -bh*0.12, bw*0.12);
+  eyeGrd.addColorStop(0, eyeColor);
+  eyeGrd.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = eyeGrd;
+  ctx.beginPath();
+  ctx.ellipse(-bw*0.15, -bh*0.12, bw*0.1, bh*0.06, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  const eyeGrd2 = ctx.createRadialGradient(bw*0.15, -bh*0.12, 0, bw*0.15, -bh*0.12, bw*0.12);
+  eyeGrd2.addColorStop(0, eyeColor);
+  eyeGrd2.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = eyeGrd2;
+  ctx.beginPath();
+  ctx.ellipse(bw*0.15, -bh*0.12, bw*0.1, bh*0.06, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Ear animation (only normal beasts)
+  if (beast.type !== 'listener') {
+    const earForward = beast.earForward || 0;
+    ctx.fillStyle = hexToStr(BEAST_FILL);
+    ctx.save();
+    ctx.translate(-bw*0.3, -bh*0.22);
+    ctx.rotate(-0.5 + earForward * 0.4);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-bw*0.08, -bh*0.12);
+    ctx.lineTo(bw*0.08, -bh*0.12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.translate(bw*0.3, -bh*0.22);
+    ctx.rotate(0.5 - earForward * 0.4);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-bw*0.08, -bh*0.12);
+    ctx.lineTo(bw*0.08, -bh*0.12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.restore(); // head tilt
+  ctx.restore(); // bob
+
+  beast.tex.needsUpdate = true;
+}
+
+// ─── BAIT RENDERING ──────────────────────────────────────────────────────────
+let baitMesh = null;
+let baitCanvas = null;
+let baitCtx = null;
+
+function createBaitMesh(tx, ty) {
+  const sz = tileSize;
+  baitCanvas = document.createElement('canvas');
+  baitCanvas.width = sz;
+  baitCanvas.height = sz;
+  baitCtx = baitCanvas.getContext('2d');
+
+  const tex = new THREE.CanvasTexture(baitCanvas);
+  const geo = new THREE.PlaneGeometry(sz, sz);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+  baitMesh = new THREE.Mesh(geo, mat);
+  baitMesh.position.set(tx * sz + sz/2, -(ty * sz + sz/2), 3);
+  gameObjects.add(baitMesh);
+  return baitMesh;
+}
+
+let baitPulseTime = 0;
+
+function drawBait(pulsePhase, fading) {
+  if (!baitCtx) return;
+  const ctx = baitCtx;
+  const cvs = baitCanvas;
+  const sz = cvs.width;
+  ctx.clearRect(0, 0, sz, sz);
+
+  const freq = fading ? 0.3 : 1.2;
+  const pulse = (Math.sin(pulsePhase * Math.PI * 2 * freq) + 1) * 0.5;
+  const r = sz * 0.12 + pulse * sz * 0.06;
+
+  // Outer glow
+  const grd = ctx.createRadialGradient(sz/2, sz/2, 0, sz/2, sz/2, sz * 0.45);
+  grd.addColorStop(0, 'rgba(200,169,110,0.6)');
+  grd.addColorStop(0.4, 'rgba(107,79,26,0.2)');
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grd;
+  ctx.beginPath();
+  ctx.arc(sz/2, sz/2, sz*0.45, 0, Math.PI*2);
+  ctx.fill();
+
+  // Core
+  const grd2 = ctx.createRadialGradient(sz/2, sz/2, 0, sz/2, sz/2, r);
+  grd2.addColorStop(0, hexToStr(BAIT_CORE));
+  grd2.addColorStop(0.5, hexToStr(BAIT_PULSE));
+  grd2.addColorStop(1, hexToStr(BAIT_DIM));
+  ctx.fillStyle = grd2;
+  ctx.beginPath();
+  ctx.arc(sz/2, sz/2, r, 0, Math.PI*2);
+  ctx.fill();
+
+  if (baitMesh) baitMesh.material.map.needsUpdate = true;
+}
+
+// ─── FOOTSTEP RIPPLE RENDERING ───────────────────────────────────────────────
+function addRipple(tx, ty) {
+  const sz = tileSize;
+  const cvs = document.createElement('canvas');
+  cvs.width = sz * 3;
+  cvs.height = sz * 3;
+  const ctx = cvs.getContext('2d');
+  const tex = new THREE.CanvasTexture(cvs);
+  const geo = new THREE.PlaneGeometry(sz * 3, sz * 3);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(tx * sz + sz/2, -(ty * sz + sz/2), 0.2);
+  gameObjects.add(mesh);
+
+  const ripple = { tx, ty, mesh, cvs, ctx, tex, timer: 0, duration: 1.2 };
+  footstepRipples.push(ripple);
+
+  // SFX
+  if (audioReady && rippleSynth && currentLevel >= 3) {
+    rippleSynth.triggerAttackRelease(440, '32n');
+  }
+
+  return ripple;
+}
+
+function updateRipples(dt) {
+  for (let i = footstepRipples.length - 1; i >= 0; i--) {
+    const r = footstepRipples[i];
+    r.timer += dt;
+    const t = r.timer / r.duration;
+    if (t >= 1) {
+      gameObjects.remove(r.mesh);
+      footstepRipples.splice(i, 1);
+      continue;
+    }
+    // Draw ring
+    const ctx = r.ctx;
+    const cvs = r.cvs;
+    const sz = cvs.width;
+    ctx.clearRect(0, 0, sz, sz);
+    const maxR = sz * 0.45;
+    const curR = maxR * t;
+    const alpha = (1 - t) * 0.1;
+    ctx.strokeStyle = `rgba(160,160,160,${alpha})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(sz/2, sz/2, curR, 0, Math.PI*2);
+    ctx.stroke();
+    r.tex.needsUpdate = true;
+  }
+}
+
+// ─── LEVEL LOADING ────────────────────────────────────────────────────────────
+function loadLevel(lvl) {
+  currentLevel = lvl;
+  const levelData = LEVELS[lvl];
+  if (!levelData) return;
+
+  gameLevel = {
+    ...levelData,
+    baitCount: levelData.baitCount
+  };
+
+  buildTileMap(levelData);
+  buildScene(levelData);
+
+  // Place player
+  player.x = levelData.playerStart.x;
+  player.y = levelData.playerStart.y;
+  player.vx = 0;
+  player.vy = 0;
+  player.facingDir = 1;
+  player.animFrame = 0;
+  player.animTimer = 0;
+  player.idleTimer = 0;
+
+  // Create player mesh
+  playerMesh = null;
+  createPlayerMesh();
+
+  // Create beasts
+  beasts = [];
+  levelData.beasts.forEach(bData => {
+    const beast = {
+      type: bData.type,
+      x: bData.startX,
+      y: bData.startY,
+      renderX: bData.startX,
+      renderY: bData.startY,
+      state: 'patrol', // patrol | alerted | chase | eating
+      facingAngle: 0,
+      sweepAngle: bData.sweepAngle,
+      sweepPeriod: bData.sweepPeriod,
+      sweepTimer: 0,
+      walkSpeed: bData.walkSpeed,
+      patrolPoints: bData.patrolPoints,
+      patrolIndex: 0,
+      patrolDir: 1,
+      walkTimer: 0,
+      targetX: bData.startX,
+      targetY: bData.startY,
+      eatTimer: 0,
+      chaseTimer: 0,
+      losBreakTimer: 0,
+      earForward: 0,
+      earTimer: 0,
+      footTimer: 0,
+      mesh: null,
+      canvas: null,
+      ctx: null,
+      tex: null,
+      coneMesh: null,
+      coneMat: null,
+      alertedByRipple: null,
+      rippleTargetX: -1,
+      rippleTargetY: -1
+    };
+    beasts.push(beast);
+  });
+
+  createBeastObjects();
+
+  // Reset bait
+  if (baitMesh) {
+    gameObjects.remove(baitMesh);
+    baitMesh = null;
+  }
+  activeBait = null;
+
+  // HUD
+  updateHUD();
+
+  // Camera
+  const sz = tileSize;
+  camX = player.x * sz;
+  camTargetX = camX;
+
+  updateCamera(0);
+}
+
+// ─── HUD ─────────────────────────────────────────────────────────────────────
+function updateHUD() {
+  const hud = document.getElementById('hud');
+  hud.innerHTML = '';
+  if (!gameLevel) return;
+  const total = LEVELS[currentLevel].baitCount;
+  for (let i = 0; i < total; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'bait-dot';
+    if (i >= gameLevel.baitCount && !(i === gameLevel.baitCount && activeBait !== null)) {
+      dot.classList.add('used');
+    }
+    hud.appendChild(dot);
+  }
+}
+
+// ─── INPUT ────────────────────────────────────────────────────────────────────
+const keys = {};
+window.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (e.key === ' ' && gameState === 'playing') {
+    e.preventDefault();
+    dropBait();
+  }
+});
+window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (gameState === 'playing') {
+    dropBait();
+  }
+});
+
+function getPlayerInput() {
+  let dx = 0, dy = 0;
+  if (keys['ArrowLeft'] || keys['a'] || keys['A']) dx = -1;
+  else if (keys['ArrowRight'] || keys['d'] || keys['D']) dx = 1;
+  if (keys['ArrowUp'] || keys['w'] || keys['W']) dy = -1;
+  else if (keys['ArrowDown'] || keys['s'] || keys['S']) dy = 1;
+  return { dx, dy };
+}
+
+// ─── BAIT SYSTEM ─────────────────────────────────────────────────────────────
+function dropBait() {
+  if (!gameLevel || gameState !== 'playing') return;
+  if (!hasEverActed) hasEverActed = true;
+
+  if (activeBait !== null) {
+    // Cancel existing bait - dim flash
+    if (baitMesh) {
+      baitMesh.material.opacity = 0.2;
+      setTimeout(() => { if (baitMesh) baitMesh.material.opacity = 1; }, 150);
+    }
+    return;
+  }
+
+  if (gameLevel.baitCount <= 0) return;
+
+  gameLevel.baitCount--;
+  updateHUD();
+
+  activeBait = {
+    tx: player.x,
+    ty: player.y,
+    timer: 0,
+    scentDuration: 8.0,
+    scentRadius: gameLevel.scentRadius,
+    eaten: false
+  };
+
+  createBaitMesh(activeBait.tx, activeBait.ty);
+  drawBait(0, false);
+
+  // SFX
+  if (audioReady && baitDropSynth) {
+    baitDropSynth.triggerAttackRelease('C4', '16n');
+  }
+}
+
+// ─── BEAST AI ─────────────────────────────────────────────────────────────────
+function angleDiff(a, b) {
+  let d = b - a;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
+
+function hasLineOfSight(ax, ay, bx, by) {
+  // Simple ray march
+  const dx = bx - ax, dy = by - ay;
+  const dist = Math.hypot(dx, dy);
+  const steps = Math.ceil(dist * 2);
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const tx = Math.round(ax + dx * t);
+    const ty = Math.round(ay + dy * t);
+    if (getTile(tx, ty) === '#') return false;
+  }
+  return true;
+}
+
+function updateBeast(beast, dt) {
+  beast.walkTimer += dt;
+
+  const px = player.x, py = player.y;
+  const bx = beast.x, by = beast.y;
+  const distToPlayer = Math.hypot(px - bx, py - by);
+
+  // Attention cone check
+  const angleToPlayer = Math.atan2(py - by, px - bx);
+  const coneDiff = Math.abs(angleDiff(beast.facingAngle, angleToPlayer));
+  const coneHalfAngle = (beast.sweepAngle || 45) * Math.PI / 180;
+  const inCone = coneDiff <= coneHalfAngle && distToPlayer <= 2.5;
+  const hasLOS = inCone && hasLineOfSight(bx, by, px, py);
+
+  // State machine
+  if (beast.state === 'eating') {
+    beast.eatTimer -= dt;
+    if (beast.eatTimer <= 0) {
+      beast.state = 'patrol';
+      // Resume patrol from bait position
+      beast.patrolPoints = [
+        { x: Math.round(beast.x), y: Math.round(beast.y) },
+        beast.patrolPoints[beast.patrolPoints.length - 1]
+      ];
+      beast.patrolIndex = 0;
+      if (eatNoiseSynth) eatNoiseSynth.triggerRelease();
+    }
+    return;
+  }
+
+  if (beast.state === 'chase') {
+    beast.chaseTimer += dt;
+
+    // Move toward player
+    const chaseSpeed = beast.walkSpeed * 1.8;
+    moveTowardTarget(beast, px, py, chaseSpeed, dt);
+
+    // Check if reached player
+    if (Math.hypot(beast.x - px, beast.y - py) < 0.6) {
+      triggerDeath();
+      return;
+    }
+
+    // Check LoS break
+    if (!hasLOS && beast.chaseTimer > 1) {
+      beast.losBreakTimer += dt;
+      if (beast.losBreakTimer >= 4.0) {
+        beast.state = 'patrol';
+        beast.chaseTimer = 0;
+        beast.losBreakTimer = 0;
+      }
+    } else {
+      beast.losBreakTimer = 0;
+    }
+
+    // Cone turns toward player in chase
+    beast.facingAngle = Math.atan2(py - by, px - bx);
+    return;
+  }
+
+  // Re-enter chase if in cone
+  if (hasLOS && beast.state !== 'eating') {
+    if (beast.state !== 'chase') {
+      beast.state = 'chase';
+      beast.chaseTimer = 0;
+      beast.losBreakTimer = 0;
+      // Alert SFX
+      if (audioReady && alertSynth) {
+        alertSynth.triggerAttackRelease('C3', '32n');
+      }
+    }
+    return;
+  }
+
+  // Bait detection (normal beasts only, not in chase)
+  if (beast.type !== 'listener' && activeBait && beast.state !== 'chase') {
+    const distToBait = Math.hypot(activeBait.tx - bx, activeBait.ty - by);
+    if (distToBait <= activeBait.scentRadius && !activeBait.eaten) {
+      // Ear animation
+      if (beast.earForward < 1) {
+        beast.earTimer += dt;
+        beast.earForward = Math.min(1, beast.earTimer / 0.3);
+      }
+
+      if (beast.earForward >= 1) {
+        // Move to bait
+        beast.state = 'alerted';
+        const arrived = moveTowardTarget(beast, activeBait.tx, activeBait.ty, beast.walkSpeed * 1.2, dt);
+        beast.facingAngle = Math.atan2(activeBait.ty - by, activeBait.tx - bx);
+
+        if (arrived || (Math.hypot(beast.x - activeBait.tx, beast.y - activeBait.ty) < 0.5)) {
+          // Start eating
+          beast.state = 'eating';
+          beast.eatTimer = gameLevel.eatDuration;
+          activeBait.eaten = true;
+          if (baitMesh) {
+            gameObjects.remove(baitMesh);
+            baitMesh = null;
+          }
+          activeBait = null;
+          beast.earForward = 0;
+          beast.earTimer = 0;
+
+          if (audioReady && eatNoiseSynth) {
+            eatNoiseSynth.triggerAttack(Tone.now());
+          }
+        }
+        return;
+      }
+    } else {
+      beast.earTimer = Math.max(0, beast.earTimer - dt);
+      beast.earForward = Math.max(0, beast.earForward - dt * 3);
+    }
+  }
+
+  // Listener: ripple detection
+  if (beast.type === 'listener') {
+    let nearestRipple = null;
+    let nearestDist = beast.sweepAngle === 30 ? 3 : 2.5; // detection radius in tiles
+
+    footstepRipples.forEach(r => {
+      const d = Math.hypot(r.tx - bx, r.ty - by);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearestRipple = r;
+      }
+    });
+
+    if (nearestRipple) {
+      beast.rippleTargetX = nearestRipple.tx;
+      beast.rippleTargetY = nearestRipple.ty;
+      beast.state = 'alerted';
+    }
+
+    if (beast.state === 'alerted' && beast.rippleTargetX >= 0) {
+      const arrived = moveTowardTarget(beast, beast.rippleTargetX, beast.rippleTargetY, beast.walkSpeed, dt);
+      beast.facingAngle = Math.atan2(beast.rippleTargetY - by, beast.rippleTargetX - bx);
+      if (arrived) {
+        beast.state = 'patrol';
+        beast.rippleTargetX = -1;
+        beast.rippleTargetY = -1;
+      }
+      return;
+    } else if (beast.state === 'alerted' && beast.rippleTargetX < 0) {
+      beast.state = 'patrol';
+    }
+  }
+
+  // Patrol
+  if (beast.state === 'patrol' || beast.state === 'alerted') {
+    if (beast.state === 'alerted' && beast.type !== 'listener') beast.state = 'patrol';
+    doPatrol(beast, dt);
+  }
+}
+
+function moveTowardTarget(beast, tx, ty, speed, dt) {
+  const dx = tx - beast.x;
+  const dy = ty - beast.y;
+  const dist = Math.hypot(dx, dy);
+
+  if (dist < 0.05) {
+    beast.x = tx;
+    beast.y = ty;
+    return true;
+  }
+
+  const step = speed * dt;
+  if (step >= dist) {
+    beast.x = tx;
+    beast.y = ty;
+    return true;
+  }
+
+  beast.x += (dx / dist) * step;
+  beast.y += (dy / dist) * step;
+  return false;
+}
+
+function doPatrol(beast, dt) {
+  const pts = beast.patrolPoints;
+  if (!pts || pts.length < 2) {
+    doSweep(beast, dt);
+    return;
+  }
+
+  const target = pts[beast.patrolIndex];
+  const arrived = moveTowardTarget(beast, target.x, target.y, beast.walkSpeed, dt);
+
+  // Face direction of travel
+  const dx = target.x - beast.x;
+  const dy = target.y - beast.y;
+  if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
+    const targetAngle = Math.atan2(dy, dx);
+    beast.facingAngle += angleDiff(beast.facingAngle, targetAngle) * Math.min(1, dt * 5);
+  }
+
+  // Sweep while stationary or near waypoint
+  if (arrived) {
+    doSweep(beast, dt);
+    beast.sweepTimer += dt;
+    if (beast.sweepTimer >= beast.sweepPeriod * 0.5) {
+      beast.sweepTimer = 0;
+      beast.patrolIndex = (beast.patrolIndex + beast.patrolDir);
+      if (beast.patrolIndex >= pts.length) {
+        beast.patrolDir = -1;
+        beast.patrolIndex = pts.length - 2;
+      } else if (beast.patrolIndex < 0) {
+        beast.patrolDir = 1;
+        beast.patrolIndex = 1;
+      }
+    }
+  }
+
+  // Beast footstep SFX
+  beast.footTimer += dt;
+  const stepInterval = 1.0 / beast.walkSpeed;
+  if (beast.footTimer > stepInterval) {
+    beast.footTimer = 0;
+    if (audioReady && beastFootstepSynth) {
+      beastFootstepSynth.triggerAttackRelease('C1', '32n');
+    }
+  }
+}
+
+function doSweep(beast, dt) {
+  beast.sweepTimer += dt;
+  const sweepAmt = (beast.sweepAngle * Math.PI / 180);
+  const baseAngle = beast.patrolPoints && beast.patrolPoints.length > 0
+    ? Math.atan2(beast.patrolPoints[1]?.y - beast.patrolPoints[0]?.y || 0,
+                 beast.patrolPoints[1]?.x - beast.patrolPoints[0]?.x || 1)
+    : 0;
+  beast.facingAngle = baseAngle + Math.sin(beast.sweepTimer / beast.sweepPeriod * Math.PI * 2) * sweepAmt;
+}
+
+// ─── PLAYER MOVEMENT ─────────────────────────────────────────────────────────
+let playerMoveTimer = 0;
+let lastPlayerTile = { x: -1, y: -1 };
+
+function updatePlayer(dt) {
+  const { dx, dy } = getPlayerInput();
+  const moving = dx !== 0 || dy !== 0;
+
+  if (moving) {
+    if (!hasEverActed) hasEverActed = true;
+    const speed = 3.5; // tiles/sec
+    const newX = player.x + dx * speed * dt;
+    const newY = player.y + dy * speed * dt;
+
+    // Collision
+    const nx = Math.round(newX);
+    const ny = Math.round(newY);
+
+    if (isWalkable(Math.round(newX), Math.round(player.y))) {
+      player.x = newX;
+      if (dx !== 0) player.facingDir = dx;
+    }
+    if (isWalkable(Math.round(player.x), Math.round(newY))) {
+      player.y = newY;
+    }
+
+    // Footstep ripple on stone tiles
+    const curTileX = Math.round(player.x);
+    const curTileY = Math.round(player.y);
+    if ((curTileX !== lastPlayerTile.x || curTileY !== lastPlayerTile.y) && currentLevel >= 3) {
+      if (isStone(curTileX, curTileY)) {
+        addRipple(curTileX, curTileY);
+      }
+      lastPlayerTile = { x: curTileX, y: curTileY };
+    }
+
+    // Animation
+    player.animTimer += dt;
+    if (player.animTimer > 1/12) {
+      player.animFrame = (player.animFrame + 1) % 6;
+      player.animTimer = 0;
+    }
+  } else {
+    // Instant stop
+    player.animFrame = 0;
+    player.animTimer = 0;
+    player.idleTimer += dt;
+  }
+
+  drawPlayer(player.animFrame, moving);
+
+  // Position player mesh
+  if (playerMesh) {
+    const sz = tileSize;
+    playerMesh.position.set(player.x * sz + sz/2, -(player.y * sz + sz/2), 2);
+    if (player.facingDir < 0) {
+      playerMesh.scale.x = -1;
+    } else {
+      playerMesh.scale.x = 1;
+    }
+  }
+
+  // Check exit
+  const etx = Math.round(player.x);
+  const ety = Math.round(player.y);
+  if (gameLevel && getTile(etx, ety) === 'E') {
+    if (hasEverActed) {
+      triggerLevelComplete();
+    }
+  }
+}
+
+// ─── CAMERA ──────────────────────────────────────────────────────────────────
+function updateCamera(dt) {
+  if (!gameLevel) return;
+
+  const sz = tileSize;
+  const { dx } = getPlayerInput();
+  const lookahead = 60;
+
+  let targetCamX = player.x * sz + sz/2 + (dx !== 0 ? dx * lookahead : 0);
+
+  // When stationary, drift toward nearest beast
+  if (dx === 0 && beasts.length > 0) {
+    let nearestBeast = beasts[0];
+    let nd = Infinity;
+    beasts.forEach(b => {
+      const d = Math.abs(b.x - player.x);
+      if (d < nd) { nd = d; nearestBeast = b; }
+    });
+    // Drift 20px over 2s
+    const driftTarget = nearestBeast.x * sz + sz/2;
+    const driftDir = driftTarget > targetCamX ? 1 : -1;
+    const driftAmt = Math.min(20, Math.abs(driftTarget - targetCamX));
+    camDriftTimer += dt;
+    const driftFrac = Math.min(1, camDriftTimer / 2.0);
+    targetCamX += driftDir * driftAmt * driftFrac * 0.3;
+  } else {
+    camDriftTimer = 0;
+  }
+
+  // Clamp camera to map
+  const halfW = window.innerWidth / 2;
+  const mapPixW = mapWidth * sz;
+  targetCamX = Math.max(halfW, Math.min(mapPixW - halfW, targetCamX));
+
+  camX += (targetCamX - camX) * Math.min(1, dt * 6);
+
+  // Apply to scene offset
+  gameObjects.position.x = window.innerWidth / 2 - camX;
+
+  // Y: center vertically on player
+  const playerPxY = player.y * sz + sz/2;
+  const centerY = window.innerHeight / 2;
+  gameObjects.position.y = centerY - playerPxY;
+
+  // Camera position (orthographic, fixed)
+  camera.left = -window.innerWidth / 2;
+  camera.right = window.innerWidth / 2;
+  camera.top = window.innerHeight / 2;
+  camera.bottom = -window.innerHeight / 2;
+  camera.updateProjectionMatrix();
+}
+
+// ─── BEAST POSITIONS ─────────────────────────────────────────────────────────
+function updateBeastMeshes() {
+  const sz = tileSize;
+  beasts.forEach(beast => {
+    if (!beast.mesh) return;
+    beast.mesh.position.set(beast.x * sz + sz/2, -(beast.y * sz + sz/2), 1);
+
+    // Flip based on facing
+    if (Math.cos(beast.facingAngle) < 0) {
+      beast.mesh.scale.x = -1;
+    } else {
+      beast.mesh.scale.x = 1;
+    }
+
+    // Update cone
+    if (beast.coneMesh) {
+      beast.coneMesh.position.set(beast.x * sz + sz/2, -(beast.y * sz + sz/2), 0.5);
+      beast.coneMesh.rotation.z = -beast.facingAngle;
+
+      const isAlerted = beast.state === 'chase';
+      beast.coneMat.color.setHex(isAlerted ? BEAST_EYE_ALERT : BEAST_EYE_NORMAL);
+      beast.coneMat.opacity = isAlerted ? 0.18 : 0.08;
+    }
+
+    drawBeast(beast);
+  });
+}
+
+// ─── BAIT UPDATE ─────────────────────────────────────────────────────────────
+function updateBait(dt) {
+  if (!activeBait) return;
+
+  activeBait.timer += dt;
+  baitPulseTime += dt;
+
+  const timeLeft = activeBait.scentDuration - activeBait.timer;
+  const fading = timeLeft < 3.0;
+
+  if (activeBait.timer >= activeBait.scentDuration) {
+    // Bait expired
+    if (baitMesh) {
+      gameObjects.remove(baitMesh);
+      baitMesh = null;
+    }
+    activeBait = null;
+    return;
+  }
+
+  drawBait(baitPulseTime, fading);
+
+  if (baitMesh) {
+    const sz = tileSize;
+    baitMesh.position.set(activeBait.tx * sz + sz/2, -(activeBait.ty * sz + sz/2), 3);
+  }
+}
+
+// ─── EXIT GLOW ANIMATION ─────────────────────────────────────────────────────
+function updateExitGlow(dt) {
+  if (!exitMesh) return;
+  exitGlowTime += dt;
+  // Pulsing brightness handled by bloom; just ensure exit tile stays visible
+}
+
+// ─── DEATH / WIN ─────────────────────────────────────────────────────────────
+let isDying = false;
+
+function triggerDeath() {
+  if (isDying || !hasEverActed) return;
+  isDying = true;
+  gameState = 'dead';
+
+  // Cut to black instantly
+  const overlay = document.getElementById('overlay');
+  overlay.style.transition = 'none';
+  overlay.style.opacity = '1';
+
+  playDeath();
+
+  setTimeout(() => {
+    isDying = false;
+    hasEverActed = false;
+    gameState = 'playing';
+    loadLevel(currentLevel);
+    overlay.style.transition = 'opacity 0.8s';
+    overlay.style.opacity = '0';
+  }, 800);
+}
+
+let isCompleting = false;
+
+function triggerLevelComplete() {
+  if (isCompleting || !hasEverActed) return;
+  isCompleting = true;
+  gameState = 'complete_anim';
+
+  playStageClear();
+
+  // Door open animation + light flood
+  const overlay = document.getElementById('overlay');
+  overlay.style.background = '#E8E0C0';
+  overlay.style.transition = 'opacity 0.4s';
+  overlay.style.opacity = '0.8';
+
+  setTimeout(() => {
+    overlay.style.background = '#000';
+    overlay.style.opacity = '1';
+
+    setTimeout(() => {
+      isCompleting = false;
+      hasEverActed = false;
+
+      if (currentLevel >= 5) {
+        // Game complete
+        gameState = 'complete';
+        overlay.style.opacity = '0';
+        const cs = document.getElementById('completeScreen');
+        cs.style.display = 'flex';
+        cs.addEventListener('pointerdown', () => {
+          cs.style.display = 'none';
+          currentLevel = 1;
+          localStorage.setItem(SAVE_KEY, '1');
+          gameState = 'playing';
+          loadLevel(1);
+        }, { once: true });
+      } else {
+        currentLevel++;
+        localStorage.setItem(SAVE_KEY, String(currentLevel));
+        gameState = 'playing';
+        loadLevel(currentLevel);
+        overlay.style.transition = 'opacity 0.8s';
+        overlay.style.opacity = '0';
+      }
+    }, 600);
+  }, 500);
+}
+
+// ─── START SCREEN ANIMATION ──────────────────────────────────────────────────
+let startScreenAnim = null;
+
+function initStartScreenAnim() {
+  const svg = document.getElementById('startSvg');
+  const titleGroup = document.getElementById('titleGroup');
+  const startBeastHead = document.getElementById('startBeastHead');
+  const ambientBaits = document.getElementById('ambientBaits');
+
+  // Title pulse
+  let titlePulseT = 0;
+  let baitSpawnTimer = 0;
+  let baitSpawnInterval = 5 + Math.random() * 2;
+  let headTargetAngle = 0;
+  let headCurrentAngle = 0;
+  let baitX = 0, baitY = 0;
+
+  function animLoop(ts) {
+    if (gameState !== 'start') return;
+    startScreenAnim = requestAnimationFrame(animLoop);
+
+    const dt = 0.016; // approx
+    titlePulseT += dt;
+
+    // Title opacity pulse
+    const pulse = 0.85 + 0.15 * (Math.sin(titlePulseT / 2.4 * Math.PI * 2) * 0.5 + 0.5);
+    titleGroup.setAttribute('opacity', pulse.toFixed(3));
+
+    // Beast head sweep
+    const sweepAngle = Math.sin(ts / 8000 * Math.PI * 2) * 15;
+    headTargetAngle += (sweepAngle - headCurrentAngle) * 0.05;
+    headCurrentAngle = headTargetAngle;
+
+    // Bait spawn
+    baitSpawnTimer += dt;
+    if (baitSpawnTimer >= baitSpawnInterval) {
+      baitSpawnTimer = 0;
+      baitSpawnInterval = 5 + Math.random() * 2;
+
+      // Random position in lower 40%
+      baitX = 100 + Math.random() * 600;
+      baitY = 300 + Math.random() * 200;
+
+      // Beast head pivots toward bait
+      const svgW = 800, svgH = 500;
+      const beastCX = 580, beastCY = 240;
+      headTargetAngle = Math.atan2(baitY - beastCY, baitX - beastCX) * 180 / Math.PI;
+
+      // Create bait dot
+      const baitEl = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      let baitLife = 0;
+      let pulseCount = 0;
+
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', baitX);
+      circle.setAttribute('cy', baitY);
+      circle.setAttribute('r', '8');
+      circle.setAttribute('fill', '#C8A96E');
+      circle.setAttribute('opacity', '0');
+      baitEl.appendChild(circle);
+      ambientBaits.appendChild(baitEl);
+
+      const glowCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      glowCircle.setAttribute('cx', baitX);
+      glowCircle.setAttribute('cy', baitY);
+      glowCircle.setAttribute('r', '8');
+      glowCircle.setAttribute('fill', 'rgba(200,169,110,0.3)');
+      glowCircle.setAttribute('opacity', '0');
+      baitEl.insertBefore(glowCircle, circle);
+
+      // Animate bait
+      let baitAnimStart = ts;
+      function baitAnim(ts2) {
+        if (gameState !== 'start') {
+          ambientBaits.removeChild(baitEl);
+          return;
+        }
+        const t = (ts2 - baitAnimStart) / 1000;
+        if (t > 4.5) {
+          if (ambientBaits.contains(baitEl)) ambientBaits.removeChild(baitEl);
+          return;
+        }
+        const pulseT = t * 1.2; // 1.2Hz
+        const pulseVal = Math.max(0, Math.sin(pulseT * Math.PI * 2));
+        const glowR = 8 + pulseVal * 16;
+        const fade = t < 3.0 ? Math.min(1, t * 2) : Math.max(0, 1 - (t - 3.0) / 1.5);
+
+        circle.setAttribute('opacity', (fade * 0.9).toFixed(2));
+        glowCircle.setAttribute('r', glowR.toFixed(1));
+        glowCircle.setAttribute('opacity', (fade * pulseVal * 0.4).toFixed(2));
+
+        requestAnimationFrame(baitAnim);
+      }
+      requestAnimationFrame(baitAnim);
+    }
+
+    // Animate beast head rotation toward target
+    const svgBeast = document.getElementById('startBeastHead');
+    if (svgBeast) {
+      const currentRotate = parseFloat(svgBeast.getAttribute('data-angle') || '0');
+      const targetDeg = headTargetAngle;
+      const newAngle = currentRotate + (targetDeg - currentRotate) * 0.04;
+      svgBeast.setAttribute('data-angle', newAngle.toFixed(2));
+      svgBeast.setAttribute('transform', `rotate(${newAngle.toFixed(2)}, 0, 150)`);
+    }
+
+    // Tap hint blink handled by CSS
+  }
+
+  startScreenAnim = requestAnimationFrame(animLoop);
+}
+
+// ─── SCREEN FUNCTIONS ─────────────────────────────────────────────────────────
+function showInstructions() {
+  document.getElementById('startScreen').classList.add('hidden');
+  const el = document.getElementById('instructionsScreen');
+  el.classList.remove('hidden');
+  requestAnimationFrame(() => {
+    el.style.opacity = '1';
+    el.style.pointerEvents = 'auto';
+  });
+  initAudio().catch(() => {});
+  gameState = 'instructions';
+}
+
+function startFromInstructions() {
+  const el = document.getElementById('instructionsScreen');
+  el.style.opacity = '0';
+  setTimeout(() => {
+    el.classList.add('hidden');
+    gameStartTime = performance.now();
+    gameState = 'playing';
+    const saved = parseInt(localStorage.getItem(SAVE_KEY) || '1');
+    currentLevel = (saved >= 1 && saved <= 5) ? saved : 1;
+    loadLevel(currentLevel);
+  }, 300);
+}
+
+document.getElementById('startScreen').addEventListener('pointerdown', showInstructions, { once: true });
+document.getElementById('instructionsScreen').addEventListener('pointerdown', startFromInstructions, { once: true });
+
+// ─── MAIN LOOP ────────────────────────────────────────────────────────────────
+let lastTime = 0;
+
+function gameLoop(ts) {
+  requestAnimationFrame(gameLoop);
+
+  const dt = Math.min(0.05, (ts - lastTime) / 1000);
+  lastTime = ts;
+
+  if (gameState !== 'playing') {
+    if (gameState === 'start') {
+      renderer.setClearColor(CAVE_BLACK);
+      // Don't render 3D scene on start screen
+      return;
+    }
+    composer.render();
+    return;
+  }
+
+  if (!gameLevel) {
+    composer.render();
+    return;
+  }
+
+  // Update player
+  updatePlayer(dt);
+
+  // Update beasts
+  beasts.forEach(b => updateBeast(b, dt));
+  updateBeastMeshes();
+
+  // Update bait
+  updateBait(dt);
+
+  // Update ripples
+  updateRipples(dt);
+
+  // Update exit glow
+  updateExitGlow(dt);
+
+  // Camera
+  updateCamera(dt);
+
+  // Music
+  updateMusicState();
+
+  // Render
+  composer.render();
+}
+
+// ─── RESIZE ──────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camW = window.innerWidth;
+  camH = window.innerHeight;
+  renderer.setSize(camW, camH);
+  composer.setSize(camW, camH);
+  bloomPass.resolution.set(camW, camH);
+
+  camera.left = -camW / 2;
+  camera.right = camW / 2;
+  camera.top = camH / 2;
+  camera.bottom = -camH / 2;
+  camera.updateProjectionMatrix();
+
+  if (gameState === 'playing' && gameLevel) {
+    loadLevel(currentLevel);
+  }
+});
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+initStartScreenAnim();
+requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>
