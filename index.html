@@ -243,6 +243,7 @@ let masterCompressor;
 
 function initAudio() {
   if (audioReady) return Promise.resolve();
+  if (typeof Tone === 'undefined') return Promise.resolve();
   return Tone.start().then(() => {
     audioReady = true;
     masterCompressor = new Tone.Compressor(-18, 4).toDestination();
@@ -393,7 +394,7 @@ function updateMusicState() {
 }
 
 function playStageClear() {
-  if (!audioReady) return;
+  if (!audioReady || typeof Tone === 'undefined') return;
   if (subBassGain) subBassGain.gain.rampTo(0, 1.2);
   if (proxGain) proxGain.gain.rampTo(0, 1.2);
   if (droneGain) droneGain.gain.rampTo(0, 1.2);
@@ -415,7 +416,7 @@ function playStageClear() {
 }
 
 function playDeath() {
-  if (!audioReady) return;
+  if (!audioReady || typeof Tone === 'undefined') return;
   if (subBassGain) subBassGain.gain.rampTo(0, 0.05);
   if (proxGain) proxGain.gain.rampTo(0, 0.05);
   if (droneGain) droneGain.gain.rampTo(0, 0.05);
@@ -1433,7 +1434,7 @@ function updateBeast(beast, dt) {
           beast.earForward = 0;
           beast.earTimer = 0;
 
-          if (audioReady && eatNoiseSynth) {
+          if (audioReady && eatNoiseSynth && typeof Tone !== 'undefined') {
             eatNoiseSynth.triggerAttack(Tone.now());
           }
         }
