@@ -171,6 +171,10 @@ canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; touch-acti
   <div class="restart-hint">TAP TO RESTART</div>
 </div>
 
+<!-- Mobile movement buttons -->
+<button id="leftBtn" style="display:none;position:fixed;bottom:80px;left:40px;width:60px;height:60px;border-radius:8px;background:rgba(200,169,110,0.15);border:1px solid rgba(200,169,110,0.4);color:rgba(200,169,110,0.8);font-size:24px;z-index:50;user-select:none;touch-action:none;align-items:center;justify-content:center;cursor:pointer;">◀</button>
+<button id="rightBtn" style="display:none;position:fixed;bottom:80px;right:120px;width:60px;height:60px;border-radius:8px;background:rgba(200,169,110,0.15);border:1px solid rgba(200,169,110,0.4);color:rgba(200,169,110,0.8);font-size:24px;z-index:50;user-select:none;touch-action:none;align-items:center;justify-content:center;cursor:pointer;">▶</button>
+
 <!-- GitHub link -->
 <a href="https://github.com/nishivector/scent-trail" target="_blank" style="position:fixed;bottom:16px;right:16px;color:rgba(255,255,255,0.4);font-size:12px;text-decoration:none;font-family:monospace;z-index:1000;">GitHub ↗</a>
 
@@ -1267,6 +1271,25 @@ renderer.domElement.addEventListener('pointerdown', e => {
   }
 });
 
+// ─── MOBILE TOUCH BUTTONS ────────────────────────────────────────────────────
+const leftBtn = document.getElementById('leftBtn');
+const rightBtn = document.getElementById('rightBtn');
+
+function addTouchBtn(el, key) {
+  el.addEventListener('pointerdown', e => { e.preventDefault(); keys[key] = true; }, { passive: false });
+  el.addEventListener('pointerup', e => { keys[key] = false; });
+  el.addEventListener('pointerout', e => { keys[key] = false; });
+  el.addEventListener('pointercancel', e => { keys[key] = false; });
+}
+addTouchBtn(leftBtn, 'ArrowLeft');
+addTouchBtn(rightBtn, 'ArrowRight');
+
+function updateMobileControls() {
+  const show = gameState === 'playing';
+  leftBtn.style.display = show ? 'flex' : 'none';
+  rightBtn.style.display = show ? 'flex' : 'none';
+}
+
 function getPlayerInput() {
   let dx = 0, dy = 0;
   if (keys['ArrowLeft'] || keys['a'] || keys['A']) dx = -1;
@@ -1763,6 +1786,7 @@ function triggerDeath() {
   if (isDying || !hasEverActed) return;
   isDying = true;
   gameState = 'dead';
+  updateMobileControls();
 
   // Cut to black instantly
   const overlay = document.getElementById('overlay');
@@ -1775,6 +1799,7 @@ function triggerDeath() {
     isDying = false;
     hasEverActed = false;
     gameState = 'playing';
+    updateMobileControls();
     loadLevel(currentLevel);
     overlay.style.transition = 'opacity 0.8s';
     overlay.style.opacity = '0';
@@ -1787,6 +1812,7 @@ function triggerLevelComplete() {
   if (isCompleting || !hasEverActed) return;
   isCompleting = true;
   gameState = 'complete_anim';
+  updateMobileControls();
 
   playStageClear();
 
@@ -1807,6 +1833,7 @@ function triggerLevelComplete() {
       if (currentLevel >= 5) {
         // Game complete
         gameState = 'complete';
+        updateMobileControls();
         overlay.style.opacity = '0';
         const cs = document.getElementById('completeScreen');
         cs.style.display = 'flex';
@@ -1815,12 +1842,14 @@ function triggerLevelComplete() {
           currentLevel = 1;
           localStorage.setItem(SAVE_KEY, '1');
           gameState = 'playing';
+          updateMobileControls();
           loadLevel(1);
         }, { once: true });
       } else {
         currentLevel++;
         localStorage.setItem(SAVE_KEY, String(currentLevel));
         gameState = 'playing';
+        updateMobileControls();
         loadLevel(currentLevel);
         overlay.style.transition = 'opacity 0.8s';
         overlay.style.opacity = '0';
@@ -1961,6 +1990,7 @@ function startFromInstructions() {
     el.classList.add('hidden');
     gameStartTime = performance.now();
     gameState = 'playing';
+    updateMobileControls();
     const saved = parseInt(localStorage.getItem(SAVE_KEY) || '1');
     currentLevel = (saved >= 1 && saved <= 5) ? saved : 1;
     loadLevel(currentLevel);
